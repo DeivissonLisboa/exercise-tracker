@@ -20,7 +20,19 @@ const userSchema = new Schema({
   },
 })
 
-const User = mongoose.model("user", userSchema)
+const User = mongoose.model("User", userSchema)
+
+const exerciseSchema = new Schema({
+  user_id: {
+    type: String,
+    required: true,
+  },
+  description: String,
+  duration: String,
+  date: Date,
+})
+
+const Exercise = mongoose.model("Exercise", exerciseSchema)
 
 // Express
 app.use(cors())
@@ -34,15 +46,102 @@ app.get("/", (req, res) => {
 app.post("/api/users", async (req, res) => {
   const username = req.body.username
 
-  let result = await User.create({ username })
-
-  res.json(result)
+  try {
+    let result = await User.create({ username })
+    res.json(result)
+  } catch (err) {
+    console.error(err)
+    res.sendStatus(500)
+  }
 })
 
 app.get("/api/users", async (req, res) => {
-  const users = await User.find()
+  try {
+    const users = await User.find()
+    res.json(users)
+  } catch (err) {
+    console.error(err)
+    res.sendStatus(500)
+  }
+})
 
-  res.json(users)
+app.post("/api/users/:_id/exercises", async (req, res) => {
+  const user_id = req.params["_id"]
+  let { description, duration, date } = req.body
+
+  if (date) {
+    date = new Date(date)
+  } else {
+    date = new Date()
+  }
+
+  try {
+    const {
+      _doc: { _id, username },
+    } = await User.findById(user_id)
+
+    const exercise = await Exercise.create({
+      user_id,
+      description,
+      duration,
+      date,
+    })
+
+    res.json({
+      _id,
+      username,
+      description,
+      duration,
+      date: date.toDateString(),
+    })
+  } catch (err) {
+    console.error(err)
+    res.sendStatus(500)
+  }
+})
+
+app.get("/api/users/:_id/logs", async (req, res) => {
+  const user_id = req.params["_id"]
+  const { from, to, limit } = req.query
+
+  let date = {}
+  if (from) {
+    date["$gte"] = new Date(from)
+  }
+  if (to) {
+    date["$lte"] = new Date(to)
+  }
+
+  let filter = {
+    user_id,
+  }
+  if (from || to) {
+    filter.date = date
+  }
+
+  try {
+    const {
+      _doc: { _id, username },
+    } = await User.findById(user_id)
+
+    const exercises = await Exercise.find(filter).limit(+limit ?? 100)
+
+    const log = exercises.map((e) => ({
+      description: e.description,
+      duration: e.duration,
+      date: e.date.toDateString(),
+    }))
+
+    res.json({
+      _id,
+      username,
+      count: exercises.length,
+      log,
+    })
+  } catch (err) {
+    console.error(err)
+    res.sendStatus(500)
+  }
 })
 
 mongoose.connection.once("open", (err) => {
