@@ -28,7 +28,7 @@ const exerciseSchema = new Schema({
     required: true,
   },
   description: String,
-  duration: String,
+  duration: Number,
   date: Date,
 })
 
